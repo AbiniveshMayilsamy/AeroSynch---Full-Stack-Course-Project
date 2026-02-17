@@ -1,0 +1,12 @@
+node_modules/
+.cache/
+*.mp4
+*.pdf
+.env
+.DS_Store
+*.log
+dist/
+build/
+coverage/
+.vscode/
+.idea/
