@@ -1,15 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const dashboardController = require('../controllers/dashboardController');
+const auth = require('../middleware/auth');
 
-router.get('/', (req, res) => {
-  res.json({ 
-    stats: {
-      totalInventory: 1247,
-      activeSuppliers: 89,
-      pendingOrders: 23,
-      systemUsers: 156
-    }
-  });
-});
+router.get('/', auth, dashboardController.getStats);
 
 module.exports = router;

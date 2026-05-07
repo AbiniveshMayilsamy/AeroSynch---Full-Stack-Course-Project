@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: airline-scm-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        value: https://your-vercel-app.vercel.app
+      - key: DB_HOST
+        fromDatabase:
+          name: airline-scm-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: airline-scm-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: airline-scm-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: airline-scm-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: airline-scm-db
+          property: password
+
+databases:
+  - name: airline-scm-db
+    databaseName: airline_scm
+    user: airline_scm_user

@@ -1,57 +1,37 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const compression = require('compression');
 const dotenv = require('dotenv');
-const bcrypt = require('bcryptjs');
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 9000;
 
 // Middleware
-app.use(cors());
+app.use(helmet());
+app.use(compression());
+app.use(cors({
+  origin: [
+    'http://localhost:3000', 
+    'http://localhost:3001', 
+    'http://localhost:3002', 
+    process.env.CLIENT_URL,
+    /\.vercel\.app$/
+  ].filter(Boolean),
+  credentials: true
+}));
+app.use(morgan('dev'));
 app.use(express.json());
-
-// In-memory storage with demo users
-global.users = [];
-global.inventory = [];
-global.suppliers = [];
-
-// Create demo admin user
-(async () => {
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  const userPassword = await bcrypt.hash('user123', 12);
-  
-  global.users.push({
-    id: '1',
-    firstName: 'Admin',
-    lastName: 'User',
-    email: 'admin@airline.com',
-    password: adminPassword,
-    department: 'operations',
-    role: 'admin',
-    createdAt: new Date()
-  });
-  
-  global.users.push({
-    id: '2',
-    firstName: 'Demo',
-    lastName: 'User',
-    email: 'user@airline.com',
-    password: userPassword,
-    department: 'supply-chain',
-    role: 'employee',
-    createdAt: new Date()
-  });
-  
-  console.log('Demo users created');
-})();
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/suppliers', require('./routes/suppliers'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/users', require('./routes/users'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
 // Health check
@@ -59,6 +39,43 @@ app.get('/api/health', (req, res) => {
   res.json({ message: 'Airline SCM Backend is running', timestamp: new Date() });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// DB connect + sync + seed
+const { sequelize, User } = require('./models');
+
+const seedAdmin = async () => {
+  const count = await User.count();
+  if (count === 0) {
+    await User.bulkCreate([
+      {
+        firstName: 'Admin',
+        lastName: 'User',
+        email: 'admin@airline.com',
+        password: 'admin123',
+        department: 'operations',
+        role: 'admin'
+      },
+      {
+        firstName: 'Demo',
+        lastName: 'User',
+        email: 'user@airline.com',
+        password: 'user123',
+        department: 'supply-chain',
+        role: 'employee'
+      }
+    ], { individualHooks: true });
+    console.log('✅ Demo users seeded');
+  }
+};
+
+sequelize.sync({ alter: true })
+  .then(async () => {
+    console.log('✅ PostgreSQL connected and tables synced');
+    await seedAdmin();
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Database connection failed:', err.message);
+    process.exit(1);
+  });

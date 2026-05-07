@@ -8,19 +8,16 @@ import logo from '../utils/logo.png';
 import BackgroundVideo from '../components/BackgroundVideo';
 
 const Login = () => {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (data) => {
     try {
-      const response = await login(data);
-      console.log('Login response:', response);
+      await login(data);
       toast.success('Login successful!');
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 100);
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Login error:', error);
       toast.error(error.response?.data?.message || error.message || 'Login failed');
@@ -123,9 +120,19 @@ const Login = () => {
                 <span className="px-3 bg-transparent text-gray-400 font-medium">Demo Credentials</span>
               </div>
             </div>
-            <div className="mt-4 text-sm text-gray-400 text-center space-y-1">
-              <p className="font-mono">admin@airline.com / admin123</p>
-              <p className="font-mono">user@airline.com / user123</p>
+            <div className="mt-4 text-sm text-center space-y-2">
+              <p
+                className="font-mono cursor-pointer px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all text-blue-300 hover:text-white"
+                onClick={() => { setValue('email', 'admin@airline.com'); setValue('password', 'admin123'); }}
+              >
+                admin@airline.com / admin123
+              </p>
+              <p
+                className="font-mono cursor-pointer px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all text-blue-300 hover:text-white"
+                onClick={() => { setValue('email', 'user@airline.com'); setValue('password', 'user123'); }}
+              >
+                user@airline.com / user123
+              </p>
             </div>
           </div>
         </div>

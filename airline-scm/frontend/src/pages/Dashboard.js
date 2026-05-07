@@ -1,108 +1,103 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Package, Users, TrendingUp, AlertTriangle, Plus, FileText, Settings } from 'lucide-react';
-import { storage } from '../utils/localStorage';
+import { Package, Users, TrendingUp, AlertTriangle, Plus, FileText, Settings, ShieldCheck } from 'lucide-react';
+import { dashboardService, orderService } from '../services/authService';
 import BackgroundVideo from '../components/BackgroundVideo';
-import { useScrollReveal } from '../hooks/useScrollReveal';
 import Footer from '../components/Footer';
-import { initializeDummyData } from '../utils/dummyData';
+import toast from 'react-hot-toast';
+
+const statusColor = (status) => {
+  const map = {
+    'Pending':    'text-orange-400',
+    'Approved':   'text-green-400',
+    'Processing': 'text-yellow-400',
+    'In Transit': 'text-blue-400',
+    'Delivered':  'text-emerald-400',
+    'Cancelled':  'text-gray-400',
+    'Rejected':   'text-red-400',
+  };
+  return map[status] || 'text-gray-400';
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
-  useScrollReveal();
-  
-  // Initialize dummy data
-  React.useEffect(() => {
-    initializeDummyData();
-  }, []);
+  const navigate = useNavigate();
+  const isAdmin = user?.role === 'admin';
+  const [stats, setStats] = useState({ totalInventory: 0, activeSuppliers: 0, systemUsers: 0, pendingOrders: 0 });
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load data from localStorage
-  const inventory = storage.getInventory();
-  const orders = storage.getOrders();
-  const suppliers = storage.getSuppliers();
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (isAdmin) {
+          const data = await dashboardService.getStats();
+          setStats(data.stats);
+          setRecentOrders(data.recentOrders || []);
+        } else {
+          // Regular user: fetch their own orders
+          const orders = await orderService.getAll();
+          setRecentOrders(orders.slice(0, 5));
+          setStats(prev => ({ ...prev, pendingOrders: orders.filter(o => o.status === 'Pending').length }));
+        }
+      } catch {
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [isAdmin]);
 
-  const stats = [
-    {
-      name: 'Total Inventory',
-      value: inventory.length || '1,247',
-      icon: Package,
-      gradient: 'from-blue-500 to-cyan-500',
-      change: '+12%'
-    },
-    {
-      name: 'Active Suppliers',
-      value: suppliers.length || '89',
-      icon: Users,
-      gradient: 'from-green-500 to-emerald-500',
-      change: '+3%'
-    },
-    {
-      name: 'Pending Orders',
-      value: orders.length || '23',
-      icon: TrendingUp,
-      gradient: 'from-purple-500 to-pink-500',
-      change: '-8%'
-    },
-    {
-      name: 'Critical Alerts',
-      value: '5',
-      icon: AlertTriangle,
-      gradient: 'from-orange-500 to-red-500',
-      change: '+2'
-    }
+  // Admin stat cards
+  const adminStats = [
+    { name: 'Total Inventory', value: stats.totalInventory, icon: Package, gradient: 'from-blue-500 to-cyan-500', link: '/inventory' },
+    { name: 'Active Suppliers', value: stats.activeSuppliers, icon: Users, gradient: 'from-green-500 to-emerald-500', link: '/suppliers' },
+    { name: 'Pending Orders', value: stats.pendingOrders, icon: TrendingUp, gradient: 'from-orange-500 to-red-500', link: '/orders' },
+    { name: 'System Users', value: stats.systemUsers, icon: AlertTriangle, gradient: 'from-purple-500 to-pink-500', link: '/admin/users' },
   ];
 
-  const recentActivities = [
-    {
-      id: 1,
-      action: 'New inventory item added',
-      details: 'Boeing 737 Engine Parts - Quantity: 50',
-      time: '2 hours ago',
-      type: 'success'
-    },
-    {
-      id: 2,
-      action: 'Supplier contract renewed',
-      details: 'AeroTech Solutions - 2 year extension',
-      time: '5 hours ago',
-      type: 'info'
-    },
-    {
-      id: 3,
-      action: 'Low stock alert',
-      details: 'Hydraulic fluid - Only 15 units remaining',
-      time: '1 day ago',
-      type: 'warning'
-    }
+  // User stat cards
+  const userStats = [
+    { name: 'My Orders', value: recentOrders.length, icon: FileText, gradient: 'from-blue-500 to-cyan-500', link: '/orders' },
+    { name: 'Pending Approval', value: stats.pendingOrders, icon: TrendingUp, gradient: 'from-orange-500 to-red-500', link: '/orders' },
+    { name: 'Approved', value: recentOrders.filter(o => o.status === 'Approved').length, icon: Package, gradient: 'from-green-500 to-emerald-500', link: '/orders' },
+    { name: 'Delivered', value: recentOrders.filter(o => o.status === 'Delivered').length, icon: AlertTriangle, gradient: 'from-purple-500 to-pink-500', link: '/orders' },
   ];
+
+  const statCards = isAdmin ? adminStats : userStats;
 
   return (
     <div className="min-h-screen rough-gradient">
       <BackgroundVideo />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
         {/* Header */}
-        <div className="mb-10 scroll-reveal">
-          <h1 className="text-5xl font-bold mb-6" style={{color: '#ffffff', textShadow: '0 0 20px rgba(255, 255, 255, 0.8), 0 0 40px rgba(255, 255, 255, 0.6), 0 0 60px rgba(255, 255, 255, 0.4)'}}>
-            Welcome back, {user?.firstName}!
-          </h1>
-          <p className="text-gray-400 mt-3 text-lg">
-            Here's what's happening with your supply chain today.
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-5xl font-bold text-white" style={{ textShadow: '0 0 20px rgba(255,255,255,0.6)' }}>
+              Welcome, {user?.firstName}!
+            </h1>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${isAdmin ? 'bg-purple-500/30 text-purple-300 border border-purple-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/20'}`}>
+              {isAdmin ? '⚡ Admin' : '👤 User'}
+            </span>
+          </div>
+          <p className="text-gray-400 text-lg">
+            {isAdmin ? 'Full system control — manage inventory, approve orders, and oversee operations.' : 'View your orders, track deliveries, and submit new purchase requests.'}
           </p>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {stats.map((stat) => {
+          {statCards.map((stat) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.name} className="shiny-card rounded-2xl p-6 hover:scale-105 transition-all duration-300 scroll-reveal">
+              <div key={stat.name} onClick={() => navigate(stat.link)} className="shiny-card rounded-2xl p-6 hover:scale-105 transition-all duration-300 cursor-pointer">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-400 mb-1">{stat.name}</p>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-3xl font-bold text-white">{stat.value}</p>
-                      <span className="text-sm text-green-400 font-semibold">{stat.change}</span>
-                    </div>
+                    <p className="text-3xl font-bold text-white">{loading ? '...' : stat.value}</p>
                   </div>
                   <div className={`bg-gradient-to-br ${stat.gradient} p-3 rounded-xl`}>
                     <Icon className="h-7 w-7 text-white" />
@@ -114,70 +109,92 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Activities */}
+          {/* Recent Orders */}
           <div className="lg:col-span-2">
             <div className="shiny-card rounded-2xl p-8">
-              <h3 className="text-2xl font-bold mb-6" style={{color: '#60a5fa', textShadow: '0 0 20px rgba(96, 165, 250, 0.8), 0 0 40px rgba(96, 165, 250, 0.6), 0 0 60px rgba(96, 165, 250, 0.4)'}}>Recent Activities</h3>
-              <div className="space-y-5">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
-                    <div className={`w-3 h-3 rounded-full mt-1.5 ${
-                      activity.type === 'success' ? 'bg-green-500 shadow-lg shadow-green-500/50' :
-                      activity.type === 'warning' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50' : 'bg-blue-500 shadow-lg shadow-blue-500/50'
-                    }`} />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-white">
-                        {activity.action}
-                      </p>
-                      <p className="text-sm text-gray-400 mt-1">{activity.details}</p>
-                      <p className="text-xs text-gray-500 mt-2">{activity.time}</p>
+              <h3 className="text-2xl font-bold mb-6 text-blue-400" style={{ textShadow: '0 0 20px rgba(96,165,250,0.8)' }}>
+                {isAdmin ? 'Recent Orders (All Users)' : 'My Recent Orders'}
+              </h3>
+              {loading ? (
+                <p className="text-gray-400">Loading...</p>
+              ) : recentOrders.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 mb-3">No orders yet.</p>
+                  <button onClick={() => navigate('/orders')} className="btn-primary text-sm">Create First Order</button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentOrders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
+                      <div>
+                        <p className="text-sm font-semibold text-white font-mono">#{order.orderNumber}</p>
+                        <p className="text-xs text-gray-400">{order.supplier} — {order.items}</p>
+                        {isAdmin && order.createdByName && (
+                          <p className="text-xs text-purple-400 mt-0.5">by {order.createdByName}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs font-bold ${statusColor(order.status)}`}>{order.status}</span>
+                        <p className="text-xs text-gray-500 mt-0.5">Qty: {order.quantity}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                  <button onClick={() => navigate('/orders')} className="w-full text-center text-blue-400 text-sm hover:text-blue-300 mt-2 py-2">
+                    View all orders →
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Actions & Profile */}
+          {/* Quick Actions */}
           <div className="space-y-6">
             <div className="shiny-card rounded-2xl p-8">
-              <h3 className="text-2xl font-bold mb-6" style={{color: '#60a5fa', textShadow: '0 0 20px rgba(96, 165, 250, 0.8), 0 0 40px rgba(96, 165, 250, 0.6), 0 0 60px rgba(96, 165, 250, 0.4)'}}>Quick Actions</h3>
+              <h3 className="text-2xl font-bold mb-6 text-blue-400" style={{ textShadow: '0 0 20px rgba(96,165,250,0.8)' }}>
+                Quick Actions
+              </h3>
               <div className="space-y-3">
-                <button onClick={() => window.location.href='/inventory'} className="w-full btn-primary text-left flex items-center gap-3">
-                  <Plus className="h-5 w-5" />
-                  Add Inventory Item
+                <button onClick={() => navigate('/orders')} className="w-full btn-primary text-left flex items-center gap-3">
+                  <Plus className="h-5 w-5" /> Create Purchase Order
                 </button>
-                <button onClick={() => window.location.href='/orders'} className="w-full btn-secondary text-left flex items-center gap-3">
-                  <FileText className="h-5 w-5" />
-                  Create Purchase Order
-                </button>
-                <button onClick={() => window.location.href='/suppliers'} className="w-full glass-card text-white px-6 py-3 rounded-xl font-semibold hover:scale-105 transition-all duration-300 flex items-center gap-3">
-                  <Settings className="h-5 w-5" />
-                  Manage Suppliers
-                </button>
+                {isAdmin && (
+                  <>
+                    <button onClick={() => navigate('/inventory')} className="w-full btn-secondary text-left flex items-center gap-3">
+                      <Package className="h-5 w-5" /> Manage Inventory
+                    </button>
+                    <button onClick={() => navigate('/suppliers')} className="w-full btn-secondary text-left flex items-center gap-3">
+                      <Settings className="h-5 w-5" /> Manage Suppliers
+                    </button>
+                    <button onClick={() => navigate('/admin/users')} className="w-full text-left flex items-center gap-3 px-6 py-3 rounded-xl font-semibold bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/20 transition-all">
+                      <ShieldCheck className="h-5 w-5" /> Manage Users
+                    </button>
+                  </>
+                )}
+                {!isAdmin && (
+                  <button onClick={() => navigate('/inventory')} className="w-full btn-secondary text-left flex items-center gap-3">
+                    <Package className="h-5 w-5" /> View Inventory
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* User Info */}
+            {/* Profile Card */}
             <div className="shiny-card rounded-2xl p-8">
-              <h3 className="text-2xl font-bold mb-6" style={{color: '#60a5fa', textShadow: '0 0 20px rgba(96, 165, 250, 0.8), 0 0 40px rgba(96, 165, 250, 0.6), 0 0 60px rgba(96, 165, 250, 0.4)'}}>Your Profile</h3>
+              <h3 className="text-2xl font-bold mb-6 text-blue-400" style={{ textShadow: '0 0 20px rgba(96,165,250,0.8)' }}>
+                Your Profile
+              </h3>
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
-                  <span className="text-sm font-medium text-gray-400 w-24">Name:</span>
-                  <span className="text-sm text-white font-semibold">{user?.firstName} {user?.lastName}</span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
-                  <span className="text-sm font-medium text-gray-400 w-24">Email:</span>
-                  <span className="text-sm text-white font-semibold">{user?.email}</span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
-                  <span className="text-sm font-medium text-gray-400 w-24">Department:</span>
-                  <span className="text-sm text-white font-semibold">{user?.department}</span>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
-                  <span className="text-sm font-medium text-gray-400 w-24">Role:</span>
-                  <span className="text-sm text-white font-semibold capitalize">{user?.role}</span>
-                </div>
+                {[
+                  { label: 'Name', value: `${user?.firstName} ${user?.lastName}` },
+                  { label: 'Email', value: user?.email },
+                  { label: 'Dept', value: user?.department },
+                  { label: 'Role', value: user?.role },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
+                    <span className="text-sm font-medium text-gray-400 w-14">{label}:</span>
+                    <span className="text-sm text-white font-semibold capitalize">{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

@@ -1,62 +1,59 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-const inventorySchema = new mongoose.Schema({
+const Inventory = sequelize.define('Inventory', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
   partNumber: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false,
     unique: true
   },
   name: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   category: {
-    type: String,
-    required: true,
-    enum: ['engine', 'avionics', 'hydraulics', 'electrical', 'structural', 'consumables']
+    type: DataTypes.ENUM('engine', 'avionics', 'hydraulics', 'electrical', 'structural', 'consumables'),
+    allowNull: false
   },
   quantity: {
-    type: Number,
-    required: true,
-    min: 0
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
   },
   minStock: {
-    type: Number,
-    required: true,
-    default: 10
+    type: DataTypes.INTEGER,
+    defaultValue: 10
   },
   unitPrice: {
-    type: Number,
-    required: true
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
   },
-  supplier: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Supplier',
-    required: true
+  supplierId: {
+    type: DataTypes.UUID,
+    allowNull: true
   },
   location: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   status: {
-    type: String,
-    enum: ['in-stock', 'low-stock', 'out-of-stock', 'on-order'],
-    default: 'in-stock'
+    type: DataTypes.ENUM('in-stock', 'low-stock', 'out-of-stock', 'on-order'),
+    defaultValue: 'in-stock'
   }
 }, {
-  timestamps: true
-});
-
-// Update status based on quantity
-inventorySchema.pre('save', function(next) {
-  if (this.quantity === 0) {
-    this.status = 'out-of-stock';
-  } else if (this.quantity <= this.minStock) {
-    this.status = 'low-stock';
-  } else {
-    this.status = 'in-stock';
+  tableName: 'inventory',
+  hooks: {
+    beforeSave: (item) => {
+      if (item.quantity === 0) item.status = 'out-of-stock';
+      else if (item.quantity <= item.minStock) item.status = 'low-stock';
+      else item.status = 'in-stock';
+    }
   }
-  next();
 });
 
-module.exports = mongoose.model('Inventory', inventorySchema);
+module.exports = Inventory;
