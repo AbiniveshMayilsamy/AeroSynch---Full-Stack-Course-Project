@@ -77,5 +77,8 @@ sequelize.sync({ alter: true })
   })
   .catch((err) => {
     console.error('❌ Database connection failed:', err.message);
+    console.error('❌ Full error:', JSON.stringify(err, null, 2));
+    console.error('❌ DATABASE_URL set:', !!process.env.DATABASE_URL);
+    console.error('❌ DB_HOST set:', !!process.env.DB_HOST);
     process.exit(1);
   });
